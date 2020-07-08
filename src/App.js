@@ -1,28 +1,24 @@
 import React, { useState, useRef, useEffect, Suspense, memo } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
-import { Canvas, extend, useThree, useFrame, useLoader } from 'react-three-fiber'
-import { useSpring, a } from 'react-spring/three'
+import { Canvas, extend, useThree, useFrame } from 'react-three-fiber';
 import { PerspectiveCamera } from 'drei';
-import MapleLeave from './textures/Maple-Leaf.png';
-
-import { newTreeGeometry } from './utils/parse-tree'
-import TreeGenerator from './utils/proctree';
-import { ForestGenerator } from "./utils/ForestGenerator";
-import { startPathFinding, setObstacles, findPath } from "./utils/pathfinding";
+import { ForestGenerator } from './utils/ForestGenerator';
+import Pathfinding from './utils/pathfinding/as';
 
 import './App.css';
 import Tree from './models/Tree'
 import PlayerModel from './models/Player'
 
 const forest = new ForestGenerator(50, 50, 10);
+const { startPathFinding, setObstacles, findPath, findPathAsync, initPathfinding } = Pathfinding;
 
 extend({ OrbitControls });
 
 const Controls = memo(({ position, target }) => {
   const orbitRef = useRef();
   const { camera, gl } = useThree();
-  
+
   useEffect(() => {
     camera.lookAt(position)
     orbitRef.current && orbitRef.current.target.copy(new THREE.Vector3(...target));
@@ -41,52 +37,6 @@ const Controls = memo(({ position, target }) => {
     />
   )
 });
-
-const Pine = (props) => {
-  var tree = new TreeGenerator({
-    "seed": 262,
-    "segments": Math.ceil(Math.random()) * 6,
-    "levels": Math.ceil(Math.random()) * 5,
-    "vMultiplier": 2.36,
-    "twigScale": Math.random(),
-    "initalBranchLength": Math.random(),
-    "lengthFalloffFactor": 0.85,
-    "lengthFalloffPower": 0.99,
-    "clumpMax": 0.454,
-    "clumpMin": 0.404,
-    "branchFactor": 2.45,
-    "dropAmount": -0.1,
-    "growAmount": 0.235,
-    "sweepAmount": 0.01,
-    "maxRadius": 0.139,
-    "climbRate": 0.371,
-    "trunkKink": 0.093,
-    "treeSteps": 5,
-    "taperRate": 0.947,
-    "radiusFalloffRate": 0.73,
-    "twistRate": 3.02,
-    "trunkLength": 2.4
-  });
-  const [leaveTexture] = useLoader(THREE.TextureLoader, [MapleLeave], () => ({ transparent: true }));
-
-  const trunkGeo = newTreeGeometry(tree);
-  const leavesGeo = newTreeGeometry(tree, true);
-
-  return (
-    <group {...props}>
-      <mesh receiveShadow castShadow>
-        <primitive attach="geometry" object={trunkGeo} />
-        <meshLambertMaterial attach="material" color={0xdddddd} />
-      </mesh>
-      {/* <mesh>
-        <primitive attach="geometry" object={leavesGeo} />        
-        <meshLambertMaterial attach="material">
-          <primitive attach="map" object={leaveTexture} />
-        </meshLambertMaterial>
-      </mesh> */}
-    </group>
-  );
-}
 
 const Pines = memo(() => {
   const [trees, setTrees] = useState([]);
@@ -116,24 +66,24 @@ const Pines = memo(() => {
 
 const Path = ({ points, target }) => {
   return <>
-    <mesh position={[target[0], 0, target[2]]} castShadow receiveShadow>
-      <boxBufferGeometry attach='geometry' args={[0.25, 0.25, 0.25]} />
-      <meshPhysicalMaterial attach='material' color="blue" />
+    <mesh position={[target[0], -0.5, target[2]]} castShadow>
+      <boxBufferGeometry attach='geometry' args={[0.25, 0.1, 0.25]} />
+      <meshPhysicalMaterial attach='material' color='darkgreen' />
     </mesh>
     {points.slice(1).map(p => (
-      <mesh position={[p[1]*2, 0, p[0]*2]} castShadow receiveShadow>
-        <boxBufferGeometry attach='geometry' args={[0.25, 0.25, 0.25]} />
-        <meshPhysicalMaterial attach='material' color="red" />
+      <mesh position={[p[1] * 2, -0.5, p[0] * 2]} castShadow>
+        <boxBufferGeometry attach='geometry' args={[0.25, 0.1, 0.25]} />
+        <meshPhysicalMaterial attach='material' color='green' />
       </mesh>
     ))}
   </>
 }
 
-const Plane = ({ handleClick }) => {
+const Plane = ({ handleClick, handleMove }) => {
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[50, -0.5, 50]} receiveShadow onClick={handleClick}>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[50, -0.5, 50]} receiveShadow onClick={handleClick} onPointerMove={handleMove}>
       <planeBufferGeometry attach='geometry' args={[100, 100, 100, 100]} />
-      <meshPhysicalMaterial attach='material' color="darkgreen" />
+      <meshPhysicalMaterial attach='material' color='darkgreen' />
     </mesh>
   );
 }
@@ -150,21 +100,36 @@ export default () => {
   const [cameraPosition, setCameraPosition] = useState([60, 5, 75]);
   const [path, setPath] = useState([]);
   const [isWalking, setIsWalking] = useState(false);
+  const [isWasmReady, setWasmReady] = useState(false);
+  const [isWorkerBusy, setIsWorkerBusy] = useState(false);
   function handleClick(e) {
+    setIsWalking(!isWalking);
+  }
+  async function handleMove(e) {
+    if (isWorkerBusy) {
+      return;
+    }
+    setIsWorkerBusy(true);
     const newTarget = [e.point.x, e.point.y, e.point.z];
     setTargetPosition(newTarget);
-    setPath(findPath(playerPosition, newTarget));
-    setIsWalking(!isWalking);
+    const path = await findPathAsync(playerPosition, newTarget);
+    setIsWorkerBusy(false);
+    setPath(path);
   }
 
   const lightTarget = new THREE.Object3D();
   lightTarget.position.set(50, 0, 50);
 
   useEffect(() => {
-    startPathFinding(50, 50);
+    if (isWasmReady) {
+      startPathFinding(50, 50);
+    }
+  }, [isWasmReady]);
+  useEffect(() => {
+    initPathfinding().then(() => setWasmReady(true));
   }, []);
 
-  return (
+  return isWasmReady && (
     <Canvas
       onCreated={({ gl }) => {
         gl.shadowMap.enabled = true
@@ -173,7 +138,7 @@ export default () => {
       }}
     >
       <Camera position={cameraPosition} />
-      <ambientLight intensity={0.75} castShadow />
+      <ambientLight intensity={0.75} />
       <spotLight
         position={[50, 10, 50]}
         penumbra={1}
@@ -181,12 +146,12 @@ export default () => {
         castShadow
       />
       {/* <fog attach='fog' args={['black', 75, 100]} /> */}
-      <Controls position={playerPosition} target={targetPosition} />
+      <Controls position={playerPosition} target={playerPosition} />
       <Suspense fallback={<></>}>
         <PlayerModel position={playerPosition} isWalking={isWalking} />
       </Suspense>
       <Suspense fallback={<></>}>
-        <Plane handleClick={handleClick} />
+        <Plane handleClick={handleClick} handleMove={handleMove} />
       </Suspense>
       <Pines />
       <Path points={path} target={targetPosition} />

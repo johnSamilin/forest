@@ -16,18 +16,14 @@
 		// global already exists
 	} else if (typeof window !== "undefined") {
 		window.global = window;
-	} else if (typeof self !== "undefined") {
-		self.global = self;
+	} else if (typeof global.self !== "undefined") {
+		global.self.global = global.self;
 	} else {
 		throw new Error("cannot export Go (neither global, window nor self is defined)");
 	}
 
-	if (!global.require && typeof require !== "undefined") {
+	if (!global.fs && typeof require !== "undefined") {
 		global.require = require;
-	}
-
-	if (!global.fs && global.require) {
-		global.fs = require("fs");
 	}
 
 	const enosys = () => {
@@ -279,7 +275,7 @@
 						const fd = getInt64(sp + 8);
 						const p = getInt64(sp + 16);
 						const n = this.mem.getInt32(sp + 24, true);
-						fs.writeSync(fd, new Uint8Array(this._inst.exports.mem.buffer, p, n));
+						global.fs.writeSync(fd, new Uint8Array(this._inst.exports.mem.buffer, p, n));
 					},
 
 					// func resetMemoryDataView()
@@ -570,11 +566,11 @@
 			process.exit(1);
 		}
 
-		const go = new Go();
+		const go = new global.Go();
 		go.argv = process.argv.slice(2);
 		go.env = Object.assign({ TMPDIR: require("os").tmpdir() }, process.env);
 		go.exit = process.exit;
-		WebAssembly.instantiate(fs.readFileSync(process.argv[2]), go.importObject).then((result) => {
+		WebAssembly.instantiate(global.fs.readFileSync(process.argv[2]), go.importObject).then((result) => {
 			process.on("exit", (code) => { // Node.js exits if no event handler is pending
 				if (code === 0 && !go.exited) {
 					// deadlock, make Go print error and stack traces
