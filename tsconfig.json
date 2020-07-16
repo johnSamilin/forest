@@ -21,5 +21,6 @@
   },
   "include": [
     "src", "public/wasm_exec.js"
-  ]
+  ],
+  "esModuleInterop": true
 }

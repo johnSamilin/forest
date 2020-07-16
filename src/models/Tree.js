@@ -18,7 +18,7 @@ export default function Tree(props) {
 
   return (
     <group rotation={[-Math.PI / 2, 0, 0]} {...props} scale={scale} dispose={null}>
-      <mesh geometry={nodes.tree_leaves001_0.geometry} position={[0, 0, -z]} castShadow>
+      <mesh geometry={nodes.tree_leaves001_0.geometry} position={[0, 0, -z]} castShadow receiveShadow>
         <meshPhysicalMaterial attach="material" color="green" />
       </mesh>
       <mesh material={materials['trunk.001']} geometry={nodes.tree_trunk001_0.geometry} position={[0, 0, -z]} castShadow receiveShadow />
