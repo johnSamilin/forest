@@ -20,7 +20,7 @@
     "jsx": "react"
   },
   "include": [
-    "src", "public/wasm_exec.js", "go/wasm_exec.js"
+    "src", "public/wasm_exec.js"
   ],
   "esModuleInterop": true
 }

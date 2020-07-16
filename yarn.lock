@@ -2171,9 +2171,9 @@ asn1@~0.2.3:
   dependencies:
     safer-buffer "~2.1.0"
 
-"assemblyscript-pathfinding@https://github.com/johnSamilin/assemblyscript-pathfinding.git":
+"assemblyscript-pathfinding@https://github.com/johnSamilin/assemblyscript-pathfinding":
   version "0.0.0"
-  resolved "https://github.com/johnSamilin/assemblyscript-pathfinding.git#b18a036de98e4be3e9ab5464fc79a149b0b121cc"
+  resolved "https://github.com/johnSamilin/assemblyscript-pathfinding#60f514f8f838caa6b51488eb8e3907a31ee67934"
 
 assert-plus@1.0.0, assert-plus@^1.0.0:
   version "1.0.0"
