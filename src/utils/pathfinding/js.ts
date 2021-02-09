@@ -13,6 +13,8 @@ function startPathFinding(width: number, height: number): boolean {
   grid = new Grid(width, height);
   finder = new BiBestFirstFinder({
     heuristic: Heuristic.octile,
+    //@ts-ignore
+    allowDiagonal: true,
   });
 
   return true;
@@ -38,10 +40,10 @@ function findPath(from: [number, number, number], to: [number, number, number]):
     return path;
   }
 
-  return Util.smoothenPath(
+  return path; /*Util.smoothenPath(
     grid,
     path
-  );
+  );*/
 }
 
 function findPathAsync(from: [number, number, number], to: [number, number, number]): Promise<Array<number[]>> {

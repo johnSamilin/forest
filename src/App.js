@@ -1,68 +1,19 @@
-import React, { useState, useRef, useEffect, Suspense, memo } from 'react'
+import React, { useState, useEffect } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
-import { Canvas, extend, useThree, useFrame } from 'react-three-fiber';
-import { PerspectiveCamera } from 'drei';
-import { ForestGenerator } from './utils/ForestGenerator';
-import Pathfinding from './utils/pathfinding/as';
+import { Canvas, extend } from 'react-three-fiber';
+
+import Pathfinding from './utils/pathfinding/threaded';
 
 import './App.css';
-import Tree from './models/Tree'
-import PlayerModel from './models/Player'
+import { Character } from './Character';
+import { Landscape, Pines } from './Landscape';
+import { Controls, Camera } from './Camera';
+import OldMan from './models/OldMan';
 
-const forest = new ForestGenerator(50, 50, 10);
-const { startPathFinding, setObstacles, findPath, findPathAsync, initPathfinding } = Pathfinding;
+const { startPathFinding, setObstacles, findPathAsync, initPathfinding } = Pathfinding;
 
 extend({ OrbitControls });
-
-const Controls = memo(({ position, target }) => {
-  const orbitRef = useRef();
-  const { camera, gl } = useThree();
-
-  useEffect(() => {
-    camera.lookAt(position)
-    orbitRef.current && orbitRef.current.target.copy(new THREE.Vector3(...target));
-  }, [position, target, orbitRef, camera]);
-
-  useFrame(() => {
-    orbitRef.current.update();
-  });
-
-  return (
-    <orbitControls
-      maxPolarAngle={Math.PI / 3}
-      minPolarAngle={Math.PI / 3}
-      args={[camera, gl.domElement]}
-      ref={orbitRef}
-    />
-  )
-});
-
-const Pines = memo(() => {
-  const [trees, setTrees] = useState([]);
-  useEffect(() => {
-    const map = forest.generate();
-    setTrees(map);
-    setObstacles(map);
-  }, []);
-
-  return (
-    <Suspense fallback={<></>}>
-      {trees.map(({ x, y, age }) => (<Tree
-        position={[
-          x * 2 + Math.random(),
-          0.2,
-          y * 2 + Math.random()
-        ]}
-        scale={[
-          0.2 + age * 0.1,
-          0.2 + age * 0.1,
-          0.2 + age * 0.1
-        ]}
-      />))}
-    </Suspense>
-  );
-});
 
 const Path = ({ points, target }) => {
   return <>
@@ -79,23 +30,9 @@ const Path = ({ points, target }) => {
   </>
 }
 
-const Plane = ({ handleClick, handleMove }) => {
-  return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[50, -0.5, 50]} receiveShadow onClick={handleClick} onPointerMove={handleMove}>
-      <planeBufferGeometry attach='geometry' args={[100, 100, 100, 100]} />
-      <meshPhysicalMaterial attach='material' color='darkgreen' />
-    </mesh>
-  );
-}
-
-const Camera = ({ position }) => {
-  return (
-    <PerspectiveCamera makeDefault position={position} fov={15} />
-  );
-}
-
 export default () => {
   const [playerPosition, setPlayerPosition] = useState([25, 0, 25]);
+  const [cameraControlsPosition, setCameraControlsPosition] = useState(playerPosition)
   const [targetPosition, setTargetPosition] = useState([25, 0, 25]);
   const [cameraPosition, setCameraPosition] = useState([60, 5, 75]);
   const [path, setPath] = useState([]);
@@ -103,10 +40,13 @@ export default () => {
   const [isWasmReady, setWasmReady] = useState(false);
   const [isWorkerBusy, setIsWorkerBusy] = useState(false);
   function handleClick(e) {
+    if (isWorkerBusy || isWalking) {
+      return;
+    }
     setIsWalking(!isWalking);
   }
   async function handleMove(e) {
-    if (isWorkerBusy) {
+    if (isWorkerBusy || isWalking) {
       return;
     }
     setIsWorkerBusy(true);
@@ -115,6 +55,19 @@ export default () => {
     const path = await findPathAsync(playerPosition, newTarget);
     setIsWorkerBusy(false);
     setPath(path);
+  }
+
+  function handlePlayerWent(x, y, z) {
+    setIsWalking(false);
+    setPlayerPosition([x, y, z]);
+    setCameraControlsPosition([x, y, z]);
+    // так камера перемещается правильно, но ее в процессе нельзя вращать и масштабировать
+    // setCameraPosition([x + 35, y + 5, z + 50]);
+  }
+
+  function handlePlayerMove(x, y, z) {
+    setCameraControlsPosition([x, y, z]);
+    // setCameraPosition([x + 35, y + 5, z + 50]);
   }
 
   const lightTarget = new THREE.Object3D();
@@ -138,22 +91,27 @@ export default () => {
       }}
     >
       <Camera position={cameraPosition} />
+      <Controls position={cameraControlsPosition} target={cameraControlsPosition} />
       <ambientLight intensity={0.75} />
       <spotLight
-        position={[50, 10, 50]}
+        position={[cameraControlsPosition[0] + 2, 3, cameraControlsPosition[2] + 2]}
         penumbra={1}
-        decay={2}
+        decay={1}
         castShadow
+        angle={Math.PI}
+        distance={50}
       />
       {/* <fog attach='fog' args={['black', 75, 100]} /> */}
-      <Controls position={playerPosition} target={playerPosition} />
-      <Suspense fallback={<></>}>
-        <PlayerModel position={playerPosition} isWalking={isWalking} />
-      </Suspense>
-      <Suspense fallback={<></>}>
-        <Plane handleClick={handleClick} handleMove={handleMove} />
-      </Suspense>
-      <Pines />
+      <Character
+        position={playerPosition}
+        isWalking={isWalking}
+        path={isWalking ? path : null}
+        onStopMoving={handlePlayerWent}
+        onMove={handlePlayerMove}
+        Model={OldMan}
+      />
+      <Landscape handleClick={handleClick} handleMove={handleMove} />
+      <Pines setObstacles={setObstacles} />
       <Path points={path} target={targetPosition} />
     </Canvas>
   );
