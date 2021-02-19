@@ -1,9 +1,12 @@
-import { Tree } from "../ForestGenerator";
+export interface Obstacle {
+  x: number;
+  y: number;
+}
 
 export interface PathfindingModule {
   initPathfinding: () => Promise<void>;
   startPathFinding: (width: number, height: number) => boolean;
-  setObstacles: (obstacles: Array<Tree>) => boolean;
+  setObstacles: (obstacles: Array<Obstacle>) => boolean;
   findPath: (from: [number, number, number], to: [number, number, number]) => Array<number[]>;
   findPathAsync: (from: [number, number, number], to: [number, number, number]) => Promise<Array<number[]>>;
 }

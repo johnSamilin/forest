@@ -1,7 +1,6 @@
 // @ts-ignore
 import { AsBind } from 'as-bind';
-import { PathfindingModule, Finder } from "./interfaces";
-import { Tree } from "../ForestGenerator";
+import { PathfindingModule, Finder, Obstacle } from "./interfaces";
 
 let grid: Int8Array;
 let finder: Finder;
@@ -23,7 +22,7 @@ function startPathFinding(_width: number, _height: number): boolean {
 
   return true;
 }
-function setObstacles(obstacles: Array<Tree>): boolean {
+function setObstacles(obstacles: Array<Obstacle>): boolean {
   obstacles.forEach(({ x, y }) => {
     grid[2 + (y * height + x)] = 1;
   });

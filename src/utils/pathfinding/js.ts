@@ -1,6 +1,5 @@
 import { Grid, BiBestFirstFinder, Heuristic, Util } from "pathfinding";
-import { PathfindingModule } from "./interfaces";
-import { Tree } from "../ForestGenerator";
+import { PathfindingModule, Obstacle } from "./interfaces";
 
 let grid: Grid;
 let finder: BiBestFirstFinder;
@@ -19,7 +18,7 @@ function startPathFinding(width: number, height: number): boolean {
 
   return true;
 }
-function setObstacles(obstacles: Array<Tree>): boolean {
+function setObstacles(obstacles: Array<Obstacle>): boolean {
   obstacles.forEach(({ x, y }) => {
     grid.setWalkableAt(y, x, false);
   });

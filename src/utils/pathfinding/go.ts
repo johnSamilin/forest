@@ -1,6 +1,5 @@
-import { Tree } from "../ForestGenerator";
 import "go-pathfinding/wasm_exec";
-import { PathfindingModule } from "./interfaces";
+import { PathfindingModule, Obstacle } from "./interfaces";
 
 async function initPathfinding(): Promise<void> {
   // @ts-ignore
@@ -18,7 +17,7 @@ function startPathFinding(width: number, height: number): boolean {
 
   return true;
 }
-function setObstacles(obstacles: Array<Tree>): boolean {
+function setObstacles(obstacles: Array<Obstacle>): boolean {
   const obstaclesArray: Array<number> = obstacles.reduce((
     aggr: Array<number>,
     {x, y}

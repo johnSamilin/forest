@@ -1,10 +1,11 @@
 // based on https://github.com/wesleykerr/level-generator/blob/master/core/src/main/java/com/seekerr/games/procedural/ForestGenerationImpl.java
+import { Obstacle } from './pathfinding/interfaces';
 
 const FOREST_STATE_EMPTY = 1;
 const FOREST_STATE_FOREST = 2;
 const FOREST_STATE_SEEDED = 3;
 
-export class Tree {
+export class Tree implements Obstacle {
   x: number;
   y: number;
   age: number;
@@ -41,11 +42,13 @@ export class ForestGenerator {
       while (true) {
         const x = Math.ceil(Math.random() * this.width);
         const y = Math.ceil(Math.random() * this.height);
-        if (this.forest[x][y] === FOREST_STATE_EMPTY) {
-          this.forest[x][y] = FOREST_STATE_FOREST;
-          this.addTree(x, y);
-          break;
-        }
+        try {
+          if (this.forest[x][y] === FOREST_STATE_EMPTY) {
+            this.forest[x][y] = FOREST_STATE_FOREST;
+            this.addTree(x, y);
+            break;
+          }
+        } catch (er) {}
       }
     }
   }

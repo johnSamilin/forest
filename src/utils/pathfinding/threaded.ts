@@ -1,6 +1,5 @@
 import Worker from './pathfinding.worker';
-import { Tree } from '../ForestGenerator';
-import { PathfindingModule } from './interfaces';
+import { PathfindingModule, Obstacle } from './interfaces';
 
 const worker = new Worker();
 
@@ -21,7 +20,7 @@ function startPathFinding(width: number, height: number): boolean {
 
   return true;
 }
-function setObstacles(obstacles: Array<Tree>): boolean {
+function setObstacles(obstacles: Array<Obstacle>): boolean {
   worker.postMessage({
     pathfinding: {
       operation: 'setObstacles',

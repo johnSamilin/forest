@@ -3,7 +3,7 @@ import { useThree, useFrame } from 'react-three-fiber';
 import * as THREE from 'three';
 import { PerspectiveCamera } from 'drei';
 
-export const Controls = memo(({ position, target }) => {
+export const Controls = memo(({ position, target, isEnabled = true }) => {
   const orbitRef = useRef();
   const { camera, gl } = useThree();
 
@@ -22,6 +22,7 @@ export const Controls = memo(({ position, target }) => {
       minPolarAngle={Math.PI / 3}
       args={[camera, gl.domElement]}
       ref={orbitRef}
+      enabled={isEnabled}
     />
   )
 });

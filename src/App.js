@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useReducer } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { Canvas, extend } from 'react-three-fiber';
-
 import Pathfinding from './utils/pathfinding/threaded';
-
-import './App.css';
+import { movePlayer } from './reducers/players';
 import { Character } from './Character';
 import { Landscape, Pines } from './Landscape';
 import { Controls, Camera } from './Camera';
-import OldMan from './models/OldMan';
+import { Context } from './context';
+import { playersReducer } from './reducers/players';
+
+import './App.css';
 
 const { startPathFinding, setObstacles, findPathAsync, initPathfinding } = Pathfinding;
 
@@ -31,47 +32,69 @@ const Path = ({ points, target }) => {
 }
 
 export default () => {
-  const [playerPosition, setPlayerPosition] = useState([25, 0, 25]);
-  const [cameraControlsPosition, setCameraControlsPosition] = useState(playerPosition)
+  const [activePlayers, setActivePlayers] = useState(['oldman']);
+  const [cameraControlsPosition, setCameraControlsPosition] = useState([25, 0, 25])
   const [targetPosition, setTargetPosition] = useState([25, 0, 25]);
   const [cameraPosition, setCameraPosition] = useState([60, 5, 75]);
   const [path, setPath] = useState([]);
-  const [isWalking, setIsWalking] = useState(false);
   const [isWasmReady, setWasmReady] = useState(false);
   const [isWorkerBusy, setIsWorkerBusy] = useState(false);
-  function handleClick(e) {
-    if (isWorkerBusy || isWalking) {
+  const [isMultipleSelectActive, setMultipleSelectActive] = useState(false);
+
+  const playerIds = [
+    'oldman',
+    'ninja-1',
+    'Manequin-2',
+    'Manequin-3',
+    'Manequin-4',
+    'Manequin-5',
+  ];
+  const [playersState, dispatch] = useReducer(playersReducer, {
+    movement: playerIds.reduce((acc, id) => ({ ...acc, [id]: null }), {}),
+    position: playerIds.reduce((acc, id, index) => ({ ...acc, [id]: [25 + index, 0, 25 + index] }), {}),
+  });
+
+  async function handleFloorClick(e) {
+    e.stopPropagation();
+    if (isWorkerBusy) {
       return;
     }
-    setIsWalking(!isWalking);
+    for (const player of activePlayers) {
+      const path = await searchPath(
+        playersState.position[player],
+        [e.point.x, e.point.y, e.point.z]
+      );
+      if (path) {
+        dispatch(movePlayer(player, path));
+      }
+    }
   }
-  async function handleMove(e) {
-    if (isWorkerBusy || isWalking) {
-      return;
+  function handleCharClick(e, playerId) {
+    e.stopPropagation();
+    if (isMultipleSelectActive) {
+      const newActivePlayers = activePlayers.find(id => id === playerId)
+        ? activePlayers.filter(id => id !== playerId)
+        : activePlayers.concat([playerId]);
+      setActivePlayers(newActivePlayers);
+    } else {
+      setActivePlayers([playerId]);
+    }
+  }
+  async function searchPath(from, to) {
+    if (isWorkerBusy) {
+      return [];
     }
     setIsWorkerBusy(true);
-    const newTarget = [e.point.x, e.point.y, e.point.z];
-    setTargetPosition(newTarget);
-    const path = await findPathAsync(playerPosition, newTarget);
+    const path = await findPathAsync(from, to);
     setIsWorkerBusy(false);
+    return path;
+  }
+  async function handleMove(e) {
+    const newTarget = [e.point.x, e.point.y, e.point.z];
+    const path = await searchPath(playersState.position[activePlayers[0]], newTarget);
+    setTargetPosition(newTarget);    
     setPath(path);
   }
-
-  function handlePlayerWent(x, y, z) {
-    setIsWalking(false);
-    setPlayerPosition([x, y, z]);
-    setCameraControlsPosition([x, y, z]);
-    // так камера перемещается правильно, но ее в процессе нельзя вращать и масштабировать
-    // setCameraPosition([x + 35, y + 5, z + 50]);
-  }
-
-  function handlePlayerMove(x, y, z) {
-    setCameraControlsPosition([x, y, z]);
-    // setCameraPosition([x + 35, y + 5, z + 50]);
-  }
-
-  const lightTarget = new THREE.Object3D();
-  lightTarget.position.set(50, 0, 50);
 
   useEffect(() => {
     if (isWasmReady) {
@@ -82,6 +105,19 @@ export default () => {
     initPathfinding().then(() => setWasmReady(true));
   }, []);
 
+  function handleKeydown(e) {
+    if (e.nativeEvent.keyCode === 16 && !isMultipleSelectActive) {
+      // left shift
+      setMultipleSelectActive(true);
+    }
+  }
+  function handleKeyup(e) {
+    if (e.nativeEvent.keyCode === 16 && isMultipleSelectActive) {
+    // left shift
+    setMultipleSelectActive(false);
+  }
+  }
+
   return isWasmReady && (
     <Canvas
       onCreated={({ gl }) => {
@@ -89,28 +125,30 @@ export default () => {
         gl.shadowMap.type = THREE.PCFSoftShadowMap
         // gl.physicallyCorrectLights = true;
       }}
+      shadowMap
+      onKeyDown={handleKeydown}
+      onKeyUp={handleKeyup}
     >
       <Camera position={cameraPosition} />
-      <Controls position={cameraControlsPosition} target={cameraControlsPosition} />
+      <Controls position={cameraControlsPosition} target={cameraControlsPosition} isEnabled={!isMultipleSelectActive} />
       <ambientLight intensity={0.75} />
-      <spotLight
-        position={[cameraControlsPosition[0] + 2, 3, cameraControlsPosition[2] + 2]}
-        penumbra={1}
-        decay={1}
-        castShadow
-        angle={Math.PI}
-        distance={50}
-      />
       {/* <fog attach='fog' args={['black', 75, 100]} /> */}
-      <Character
-        position={playerPosition}
-        isWalking={isWalking}
-        path={isWalking ? path : null}
-        onStopMoving={handlePlayerWent}
-        onMove={handlePlayerMove}
-        Model={OldMan}
-      />
-      <Landscape handleClick={handleClick} handleMove={handleMove} />
+
+      <Context.Provider value={{ dispatch, playersState }}>
+        {playerIds.map((id) => <Character
+          id={id}
+          position={playersState.position[id]}
+          model="player/Manequin"
+          isSelected={activePlayers.includes(id)}
+          onClick={handleCharClick}
+        />)}
+        <Landscape
+          handleClick={handleFloorClick}
+          handleMove={handleMove}
+          isMultipleSelectActive={isMultipleSelectActive}
+          onSelect={setActivePlayers}
+        />
+      </Context.Provider>
       <Pines setObstacles={setObstacles} />
       <Path points={path} target={targetPosition} />
     </Canvas>
